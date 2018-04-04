@@ -15,7 +15,7 @@ import java.util.logging.Logger;
  * What is
  */
 public class Markov2 {
-    private static final int WINDOW_SIZE = 2;
+    private static final int WINDOW_SIZE = 1;
     private static final int NULL_SAFE_RETRIES = 5;
     private static final int NUMBER_OF_SENTENCES = 150;
     private static final String SENTENCE_DELIMITER = ".";
@@ -35,10 +35,25 @@ public class Markov2 {
         LineFeeder feeder = new ListFeeder(filePath);
         app.train(feeder);
 
-        LOG.info("============ histogram " + app.trainingMap);
+        app.printHistogram();
 
         for (int i = 0; i < NUMBER_OF_SENTENCES; i++) {
             System.out.println(app.generate());
+        }
+    }
+
+    private void printHistogram() {
+        Map<Integer, Integer> histogram = new HashMap<>();
+        for (Map.Entry<String, List<String>> entry : trainingMap.entrySet()) {
+            int valueSize = entry.getValue().size();
+//            System.out.printf("%s: %s\n", entry.getKey(), valueSize);
+            int numberOfEntriesWithThatSize = histogram.getOrDefault(valueSize, 0);
+            numberOfEntriesWithThatSize++;
+            histogram.put(valueSize, numberOfEntriesWithThatSize);
+        }
+
+        for (Map.Entry<Integer, Integer> entry : histogram.entrySet()) {
+            System.out.printf("Entries with %s prefixes: %s\n", entry.getKey(), entry.getValue());
         }
     }
 
@@ -54,23 +69,23 @@ public class Markov2 {
 
         for (int wordIndex = 0; wordIndex < words.length - 1; wordIndex++) {
             String currentWord = words[wordIndex];
-            LOG.info("looking at " + currentWord);
+            LOG.fine("looking at " + currentWord);
             recentWords.add(currentWord); //tail
 
-            LOG.info("has suff data? " + recentWords.size());
+            LOG.fine("has suff data? " + recentWords.size());
             if (!hasSufficientData(recentWords)) {
-                LOG.info("skip this round");
+                LOG.fine("skip this round");
                 continue;
             }
 
             String prefix = mergePrefix(recentWords);
-            LOG.info("Looking at prefix: " + prefix);
+            LOG.fine("Looking at prefix: " + prefix);
             List<String> suffixes = trainingMap.getOrDefault(prefix, new ArrayList<>());
             String suffixToAdd = words[wordIndex + 1];
-            LOG.info("looking at suffix to add: " + suffixToAdd);
+            LOG.fine("looking at suffix to add: " + suffixToAdd);
             suffixes.add(suffixToAdd);
             trainingMap.put(prefix, suffixes);
-            LOG.info("map: " + trainingMap);
+            LOG.fine("map: " + trainingMap);
 
             recentWords.remove(); //head
         }
