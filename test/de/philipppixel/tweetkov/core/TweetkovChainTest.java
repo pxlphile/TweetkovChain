@@ -1,4 +1,4 @@
-package de.philipppixel.markov;
+package de.philipppixel.tweetkov.core;
 
 import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.Test;
@@ -8,16 +8,16 @@ import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class Markov2Test {
-    private Markov2 sut = new Markov2();
+class TweetkovChainTest {
+    private TweetkovChain sut = new TweetkovChain();
 
     @Test
     void trainShouldResultInSingleElementList() {
         // given
-        TestFeeder feeder = new TestFeeder("First Second Third");
+        List<String> input = Collections.singletonList("First Second Third");
 
         // when
-        sut.train(feeder);
+        sut.train(input);
 
         // then
         Map<String, List<String>> actual = sut.getTrainingMap();
@@ -31,10 +31,10 @@ class Markov2Test {
     @Test
     void testTrainOnFullText() {
         // given
-        TestFeeder feeder = new TestFeeder("now he is gone she said he is gone for good");
+        List<String> input = Collections.singletonList("now he is gone she said he is gone for good");
 
         // when
-        sut.train(feeder);
+        sut.train(input);
 
         // then
         Map<String, List<String>> actual = sut.getTrainingMap();
@@ -51,36 +51,13 @@ class Markov2Test {
     @Test
     void generateShouldCreateNonEmptySentences() {
         // given
-        TestFeeder feeder = new TestFeeder("now he is gone she said he is gone for good");
-        sut.train(feeder);
+        List<String> input = Collections.singletonList("now he is gone she said he is gone for good");
+        sut.train(input);
 
         // when
         String actual = sut.generate();
 
         // then
         assertThat(actual).matches("[a-zA-Z]+( [a-zA-Z]+)+ ?\\.");
-    }
-
-    private class TestFeeder implements LineFeeder {
-        private List<String> line;
-
-        TestFeeder(String line) {
-            this.line = Collections.singletonList(line);
-        }
-
-        @Override
-        public Iterator<String> iterator() {
-            return line.iterator();
-        }
-
-        @Override
-        public void forEach(Consumer<? super String> action) {
-            //
-        }
-
-        @Override
-        public Spliterator<String> spliterator() {
-            return null;
-        }
     }
 }

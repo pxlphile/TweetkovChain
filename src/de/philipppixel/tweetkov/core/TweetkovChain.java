@@ -1,10 +1,10 @@
-package de.philipppixel.markov;
+package de.philipppixel.tweetkov.core;
 
 import java.util.*;
 import java.util.logging.Logger;
 
 /**
- * A sliding window markov chain text generator.
+ * A sliding window tweetkov chain text generator.
  * <p>
  * <code>first second third.</code>: A window size of two takes two subsequent words and maps the following of it:
  * "first second" -&gt; third. "first second" is called a <code>prefix</code> while "third" is the <code>suffix</code>.
@@ -14,39 +14,22 @@ import java.util.logging.Logger;
  *
  * What is
  */
-public class Markov2 {
-    private static final int WINDOW_SIZE = 1;
+public class TweetkovChain {
+    private static final int WINDOW_SIZE = 2;
     private static final int NULL_SAFE_RETRIES = 5;
     private static final int NUMBER_OF_SENTENCES = 150;
     private static final String SENTENCE_DELIMITER = ".";
     private static final String WORD_DELIMITER = " ";
     private static final String EMPTY_RESULT = "";
-    private static final Logger LOG = Logger.getLogger(Markov2.class.getName());
+    private static final Logger LOG = Logger.getLogger(TweetkovChain.class.getName());
 
     private Map<String, List<String>> trainingMap = new HashMap<>();
 
-    public static void main(String[] args) {
-        String filePath = args[0];
-        if (filePath == null || filePath.isEmpty()) {
-            throw new IllegalArgumentException("Please call with absolute file path as only argument");
-        }
-
-        Markov2 app = new Markov2();
-        LineFeeder feeder = new ListFeeder(filePath);
-        app.train(feeder);
-
-        app.printHistogram();
-
-        for (int i = 0; i < NUMBER_OF_SENTENCES; i++) {
-            System.out.println(app.generate());
-        }
-    }
-
-    private void printHistogram() {
+    public void printHistogram() {
         Map<Integer, Integer> histogram = new HashMap<>();
         for (Map.Entry<String, List<String>> entry : trainingMap.entrySet()) {
             int valueSize = entry.getValue().size();
-//            System.out.printf("%s: %s\n", entry.getKey(), valueSize);
+            System.out.printf("%s: %s\n", entry.getKey(), valueSize);
             int numberOfEntriesWithThatSize = histogram.getOrDefault(valueSize, 0);
             numberOfEntriesWithThatSize++;
             histogram.put(valueSize, numberOfEntriesWithThatSize);
@@ -57,7 +40,7 @@ public class Markov2 {
         }
     }
 
-    public void train(LineFeeder feeder) {
+    public void train(Iterable<String> feeder) {
         for (String line : feeder) {
             trainSingleLine(line.toLowerCase());
         }
@@ -108,11 +91,11 @@ public class Markov2 {
         return merged.trim();
     }
 
-    String generate() {
+    public String generate() {
         String prefix = getRandomPrefix();
         String result = prefix;
 
-        int numberOfWordsPerSentence = 16;
+        int numberOfWordsPerSentence = 32;
         for (int i = 0; i < numberOfWordsPerSentence; i++) {
             String suffix = getRandomSuffix(prefix);
             result += WORD_DELIMITER + suffix;
