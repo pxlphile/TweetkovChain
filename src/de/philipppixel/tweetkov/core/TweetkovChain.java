@@ -8,16 +8,15 @@ import java.util.logging.Logger;
  * <p>
  * <code>first second third.</code>: A window size of two takes two subsequent words and maps the following of it:
  * "first second" -&gt; third. "first second" is called a <code>prefix</code> while "third" is the <code>suffix</code>.
- *
+ * <p>
  * Multiple occurrences of the same word possible and desired because the selection
  * probability rises later on.
- *
+ * <p>
  * What is
  */
 public class TweetkovChain {
     private static final int WINDOW_SIZE = 2;
     private static final int NULL_SAFE_RETRIES = 5;
-    private static final int NUMBER_OF_SENTENCES = 150;
     private static final String SENTENCE_DELIMITER = ".";
     private static final String WORD_DELIMITER = " ";
     private static final String EMPTY_RESULT = "";
@@ -42,7 +41,7 @@ public class TweetkovChain {
 
     public void train(Iterable<String> feeder) {
         for (String line : feeder) {
-            trainSingleLine(line.toLowerCase());
+            trainSingleLine(line);
         }
     }
 
@@ -52,6 +51,8 @@ public class TweetkovChain {
 
         for (int wordIndex = 0; wordIndex < words.length - 1; wordIndex++) {
             String currentWord = words[wordIndex];
+            currentWord = replaceSpecialChars(currentWord);
+
             LOG.fine("looking at " + currentWord);
             recentWords.add(currentWord); //tail
 
@@ -61,7 +62,7 @@ public class TweetkovChain {
                 continue;
             }
 
-            String prefix = mergePrefix(recentWords);
+            String prefix = mergeToLowerCasePrefix(recentWords);
             LOG.fine("Looking at prefix: " + prefix);
             List<String> suffixes = trainingMap.getOrDefault(prefix, new ArrayList<>());
             String suffixToAdd = words[wordIndex + 1];
@@ -74,6 +75,20 @@ public class TweetkovChain {
         }
     }
 
+    String replaceSpecialChars(String currentWord) {
+        return currentWord.replace("*", " * ")
+                .replace("&amp;", "&")
+                .replace("&gt;", ">")
+                .replace("&lt;", "<")
+                .replace("\\", " ")
+                .replace("\"", " ")
+                .replace("(", " ")
+                .replace(")", " ")
+                .replace("[", " ")
+                .replace("]", " ")
+                .replace("  ", " ");
+    }
+
     private boolean hasSufficientData(Queue<String> recentWords) {
         int currentPrefixSize = recentWords.size();
         if (currentPrefixSize > WINDOW_SIZE) {
@@ -82,11 +97,11 @@ public class TweetkovChain {
         return currentPrefixSize == WINDOW_SIZE;
     }
 
-    private String mergePrefix(Queue<String> recentWords) {
+    private String mergeToLowerCasePrefix(Queue<String> recentWords) {
         String merged = "";
 
         for (String word : recentWords) {
-            merged += word + WORD_DELIMITER;
+            merged += word.toLowerCase() + WORD_DELIMITER;
         }
         return merged.trim();
     }
@@ -117,7 +132,7 @@ public class TweetkovChain {
         prefixesAsQueue.add(suffix); // tail
         prefixesAsQueue.remove(); // head
 
-        return mergePrefix(prefixesAsQueue);
+        return mergeToLowerCasePrefix(prefixesAsQueue);
     }
 
     private String getRandomSuffix(String prefix) {

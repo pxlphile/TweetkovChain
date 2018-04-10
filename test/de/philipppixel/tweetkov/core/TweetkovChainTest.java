@@ -60,4 +60,11 @@ class TweetkovChainTest {
         // then
         assertThat(actual).matches("[a-zA-Z]+( [a-zA-Z]+)+ ?\\.");
     }
+
+    @Test
+    void replaceStringShouldReplaceAllOccurrences() {
+        String actual = sut.replaceSpecialChars("&amp;&amp;\"\"&gt;");
+
+        assertThat(actual).isEqualToIgnoringCase("&& >");
+    }
 }

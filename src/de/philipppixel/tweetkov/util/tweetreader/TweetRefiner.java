@@ -54,6 +54,9 @@ public class TweetRefiner {
 
     private static String refineSentence(String sentence) {
         sentence = sentence.replace("*", " * ");
+        sentence = sentence.replace("&amp;", "&");
+        sentence = sentence.replace("&gt;", ">");
+        sentence = sentence.replace("&lt;", "<");
         sentence = sentence.replace(".", " . ");
         sentence = sentence.replace(",", " , ");
         sentence = sentence.replace(":", " : ");

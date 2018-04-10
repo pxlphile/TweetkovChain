@@ -7,7 +7,7 @@ import de.philipppixel.tweetkov.util.tweetreader.TweetRefiner;
 import java.util.List;
 
 public class TweetkovRunner {
-    private static final int NUMBER_OF_SENTENCES = 200;
+    private static final int NUMBER_OF_SENTENCES = 400;
     private final String tweetDirectory;
     private final TweetkovChain app;
 
@@ -69,7 +69,19 @@ public class TweetkovRunner {
                 "2016_04.js",
                 "2016_03.js",
                 "2016_02.js",
-                "2016_01.js"
+                "2016_01.js",
+                "2015_12.js",
+                "2015_11.js",
+                "2015_10.js",
+                "2015_09.js",
+                "2015_08.js",
+                "2015_07.js",
+                "2015_06.js",
+                "2015_05.js",
+                "2015_04.js",
+                "2015_03.js",
+                "2015_02.js",
+                "2015_01.js"
         };
     }
 
@@ -82,7 +94,12 @@ public class TweetkovRunner {
 //        app.printHistogram();
 
         for (int i = 0; i < NUMBER_OF_SENTENCES; i++) {
-            System.out.println(app.generate());
+            String sentence = app.generate();
+            if(sentence.split(" ").length < 5) {
+                i--;
+                continue;
+            }
+            System.out.println(sentence);
         }
     }
 }
