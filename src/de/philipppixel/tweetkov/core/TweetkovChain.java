@@ -4,7 +4,7 @@ import java.util.*;
 import java.util.logging.Logger;
 
 /**
- * A sliding window tweetkov chain text generator.
+ * TweetkovChain - the tweet Markov-chain text generator.
  * <p>
  * <code>first second third.</code>: A window size of two takes two subsequent words and maps the following of it:
  * "first second" -&gt; third. "first second" is called a <code>prefix</code> while "third" is the <code>suffix</code>.
@@ -12,10 +12,41 @@ import java.util.logging.Logger;
  * Multiple occurrences of the same word possible and desired because the selection
  * probability rises later on.
  * <p>
- * What is
+ * The window size determines (also known as the order of a Markov Chain) the structure of the dictionary (that is the
+ * map from prefix-&gt;suffix). While a window size of one suffices for a small text base the textual stringency rises
+ * with the window size because more prefix tokens are taken into consideration. And while this CAN lead to a better
+ * textual stringency it also means that the word histogram MAY look totally different in terms of probable suffix
+ * selection. Exactly one suffix for a prefix has a general probability of p=1.0 for selection which in turn leads to
+ * a very high probability to re-generate already existing sentences.
+ *
+ * <p>
+ * For a window size of one, dictionary may look like this:
+ * <code>
+ * hello -&gt; [again,world,my]<br/>
+ * my -&gt; [old,little]<br/>
+ * little -&gt; [pony]<br/>
+ * old -&gt; [friend]<br/>
+ * again -&gt; []<br/>
+ * world -&gt; []<br/>
+ * friend -&gt; []<br/>
+ * pony -&gt; []<br/>
+ * </code>
+ * while for a window size of two the dictionary may look like this
+ * * <code>
+ * hello world -&gt; []<br/>
+ * hello again -&gt; []<br/>
+ * hello my -&gt; [old]<br/>
+ * my little -&gt; [pony]<br/>
+ * my old -&gt; [friend]<br/>
+ * little pony -&gt; []<br/>
+ * old friend -&gt; []<br/>
+ * </code>
+ *
+ * With a small dictionary you may want to select a window size of 1, while with a larger dictionary a window size of
+ * 2 or even 3 may be good choices.
  */
 public class TweetkovChain {
-    private static final int WINDOW_SIZE = 2;
+    private static final int DEFAULT_WINDOW_SIZE = 2;
     private static final int NULL_SAFE_RETRIES = 5;
     private static final String SENTENCE_DELIMITER = ".";
     private static final String WORD_DELIMITER = " ";
@@ -23,6 +54,18 @@ public class TweetkovChain {
     private static final Logger LOG = Logger.getLogger(TweetkovChain.class.getName());
 
     private Map<String, List<String>> trainingMap = new HashMap<>();
+    private final int windowSize;
+
+    /**
+     * Creates a {@link TweetkovChain} with the default window size
+     */
+    public TweetkovChain() {
+        this(DEFAULT_WINDOW_SIZE);
+    }
+
+    public TweetkovChain(int windowSize) {
+        this.windowSize = windowSize;
+    }
 
     public void printHistogram() {
         Map<Integer, Integer> histogram = new HashMap<>();
@@ -47,7 +90,7 @@ public class TweetkovChain {
 
     private void trainSingleLine(String trainingLine) {
         String[] words = trainingLine.split(WORD_DELIMITER);
-        Queue<String> recentWords = new ArrayDeque<>(WINDOW_SIZE);
+        Queue<String> recentWords = new ArrayDeque<>(this.windowSize);
 
         for (int wordIndex = 0; wordIndex < words.length - 1; wordIndex++) {
             String currentWord = words[wordIndex];
@@ -91,10 +134,10 @@ public class TweetkovChain {
 
     private boolean hasSufficientData(Queue<String> recentWords) {
         int currentPrefixSize = recentWords.size();
-        if (currentPrefixSize > WINDOW_SIZE) {
+        if (currentPrefixSize > this.windowSize) {
             throw new IllegalStateException("Prefix size is too large: " + recentWords);
         }
-        return currentPrefixSize == WINDOW_SIZE;
+        return currentPrefixSize == this.windowSize;
     }
 
     private String mergeToLowerCasePrefix(Queue<String> recentWords) {
@@ -118,10 +161,8 @@ public class TweetkovChain {
             if (suffix.equals(EMPTY_RESULT)) {
                 break;
             }
-
             prefix = createNewPrefix(prefix, suffix);
         }
-
         return result.trim() + SENTENCE_DELIMITER;
     }
 

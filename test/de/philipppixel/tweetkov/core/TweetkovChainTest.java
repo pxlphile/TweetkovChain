@@ -24,7 +24,7 @@ class TweetkovChainTest {
         assertThat(actual).isNotNull();
 
         String expectedPrefix = "First Second".toLowerCase();
-        ArrayList<String> expectedSuffix = Lists.newArrayList("Third".toLowerCase());
+        ArrayList<String> expectedSuffix = Lists.newArrayList("Third");
         assertThat(actual.get(expectedPrefix)).isEqualTo(expectedSuffix);
     }
 
