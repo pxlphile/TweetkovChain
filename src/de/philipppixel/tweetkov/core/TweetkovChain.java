@@ -119,17 +119,11 @@ public class TweetkovChain {
     }
 
     String replaceSpecialChars(String currentWord) {
-        return currentWord.replace("*", " * ")
-                .replace("&amp;", "&")
-                .replace("&gt;", ">")
-                .replace("&lt;", "<")
-                .replace("\\", " ")
-                .replace("\"", " ")
-                .replace("(", " ")
-                .replace(")", " ")
-                .replace("[", " ")
-                .replace("]", " ")
-                .replace("  ", " ");
+        return currentWord
+                .replaceAll("&amp;", "&")
+                .replaceAll("&gt;", ">")
+                .replaceAll("&lt;", "<")
+                .replaceAll("\\.\\.\\.", "\\u2026");
     }
 
     private boolean hasSufficientData(Queue<String> recentWords) {

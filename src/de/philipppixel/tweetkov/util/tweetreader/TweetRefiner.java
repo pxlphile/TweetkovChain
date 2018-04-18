@@ -53,18 +53,13 @@ public class TweetRefiner {
     }
 
     private static String refineSentence(String sentence) {
-        sentence = sentence.replace("*", " * ");
-        sentence = sentence.replace("&amp;", "&");
-        sentence = sentence.replace("&gt;", ">");
-        sentence = sentence.replace("&lt;", "<");
-        sentence = sentence.replace(".", " . ");
-        sentence = sentence.replace(",", " , ");
-        sentence = sentence.replace(":", " : ");
-        sentence = sentence.replace("\"", " ");
-        sentence = sentence.replace("(", " ");
-        sentence = sentence.replace(")", " ");
-        sentence = sentence.replace("[", " ");
-        sentence = sentence.replace("]", " ");
+        sentence = sentence
+                .replaceAll("&amp;", "&")
+                .replaceAll("&gt;", ">")
+                .replaceAll("&lt;", "<")
+                .replaceAll("\\.\\.\\.", "\\u2026")
+                .replaceAll(" +", " ")
+                .replaceAll("@[a-zA-Z0-9_]+]", "@redacted");
         return sentence.trim();
     }
 

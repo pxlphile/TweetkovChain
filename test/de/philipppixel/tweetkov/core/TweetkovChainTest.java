@@ -63,8 +63,8 @@ class TweetkovChainTest {
 
     @Test
     void replaceStringShouldReplaceAllOccurrences() {
-        String actual = sut.replaceSpecialChars("&amp;&amp;\"\"&gt;");
+        String actual = sut.replaceSpecialChars("&amp;&amp;&gt;");
 
-        assertThat(actual).isEqualToIgnoringCase("&& >");
+        assertThat(actual).isEqualToIgnoringCase("&&>");
     }
 }
