@@ -6,19 +6,22 @@ import de.philipppixel.tweetkov.util.tweetreader.TweetRefiner;
 
 import java.util.List;
 
+/**
+ * uses a (extracted) Tweet archives for training
+ */
 public class TweetkovRunner {
     private static final int NUMBER_OF_SENTENCES = 400;
     private final String tweetDirectory;
     private final TweetkovChain app;
 
-    public TweetkovRunner(String directory) {
-        tweetDirectory = directory;
-        app = new TweetkovChain();
-    }
-
     public static void main(String[] args) {
         String directory = args[0];
         new TweetkovRunner(directory).run();
+    }
+
+    public TweetkovRunner(String directory) {
+        tweetDirectory = directory;
+        app = new TweetkovChain();
     }
 
     private void run() {
@@ -90,7 +93,6 @@ public class TweetkovRunner {
     }
 
     private void makeItWeird() {
-
 //        app.printHistogram();
 
         for (int i = 0; i < NUMBER_OF_SENTENCES; i++) {
