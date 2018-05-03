@@ -8,19 +8,16 @@ import java.util.logging.Logger;
  * <p>
  * <code>first second third.</code>: A window size of two takes two subsequent words and maps the following of it:
  * "first second" -&gt; third. "first second" is called a <code>prefix</code> while "third" is the <code>suffix</code>.
- * <p>
- * Multiple occurrences of the same word possible and desired because the selection
- * probability rises later on.
+ * <p>Multiple occurrences of the same word possible and desired because the selection</p>
+ * probability rises later on.</p>
  * <p>
  * The window size determines (also known as the order of a Markov Chain) the structure of the dictionary (that is the
  * map from prefix-&gt;suffix). While a window size of one suffices for a small text base the textual stringency rises
  * with the window size because more prefix tokens are taken into consideration. And while this CAN lead to a better
  * textual stringency it also means that the word histogram MAY look totally different in terms of probable suffix
  * selection. Exactly one suffix for a prefix has a general probability of p=1.0 for selection which in turn leads to
- * a very high probability to re-generate already existing sentences.
- *
- * <p>
- * For a window size of one, dictionary may look like this:
+ * a very high probability to re-generate already existing sentences.</p>
+ * <p>For a window size of one, dictionary may look like this:</p>
  * <code>
  * hello -&gt; [again,world,my]<br/>
  * my -&gt; [old,little]<br/>
@@ -41,20 +38,24 @@ import java.util.logging.Logger;
  * little pony -&gt; []<br/>
  * old friend -&gt; []<br/>
  * </code>
- *
+ * <p>
  * With a small dictionary you may want to select a window size of 1, while with a larger dictionary a window size of
- * 2 or even 3 may be good choices.
+ * 2 or even 3 may be good choices.</p>
  */
 public class TweetkovChain {
-    private static final int DEFAULT_WINDOW_SIZE = 2;
+    public static final int DEFAULT_WINDOW_SIZE = 2;
+    private static final int MAX_NUMBER_OF_WORDS_PER_SENTENCE = 32;
     private static final int NULL_SAFE_RETRIES = 5;
     private static final String SENTENCE_DELIMITER = ".";
     private static final String WORD_DELIMITER = " ";
     private static final String EMPTY_RESULT = "";
     private static final Logger LOG = Logger.getLogger(TweetkovChain.class.getName());
+    private static final int ORIGINAL_START_PREFIX_PROBABILITY_IN_PERCENT = 67;
 
-    private Map<String, List<String>> trainingMap = new HashMap<>();
-    private final int windowSize;
+    private final Map<Prefix, List<String>> trainingMap = new HashMap<>();
+    private final List<Prefix> startPrefixes = new ArrayList<>();
+    private int windowSize;
+    private Random random;
 
     /**
      * Creates a {@link TweetkovChain} with the default window size
@@ -64,137 +65,161 @@ public class TweetkovChain {
     }
 
     public TweetkovChain(int windowSize) {
-        this.windowSize = windowSize;
+        setWindowSize(windowSize);
+        this.random = new Random();
     }
 
     public void printHistogram() {
         Map<Integer, Integer> histogram = new HashMap<>();
-        for (Map.Entry<String, List<String>> entry : trainingMap.entrySet()) {
+        for (Map.Entry<Prefix, List<String>> entry : trainingMap.entrySet()) {
             int valueSize = entry.getValue().size();
-            System.out.printf("%s: %s\n", entry.getKey(), valueSize);
+            System.out.printf("%s: %s\n", entry.getKey().toString(), valueSize);
             int numberOfEntriesWithThatSize = histogram.getOrDefault(valueSize, 0);
             numberOfEntriesWithThatSize++;
             histogram.put(valueSize, numberOfEntriesWithThatSize);
         }
 
         for (Map.Entry<Integer, Integer> entry : histogram.entrySet()) {
-            System.out.printf("Entries with %s prefixes: %s\n", entry.getKey(), entry.getValue());
+            System.out.printf("Entries with %s prefixes: %s\n", entry.getKey().toString(), entry.getValue());
         }
     }
 
-    public void train(Iterable<String> feeder) {
-        for (String line : feeder) {
-            trainSingleLine(line);
+    /**
+     * Takes a collection or array of sentences and creates a mapping from prefixes to suffixes for each one
+     * for later generation of sentences using the Markov property.
+     *
+     * @param sentences a collection or array of sentences
+     */
+    public void train(Iterable<String> sentences) {
+        for (String sentence : sentences) {
+            trainSingleLine(sentence);
         }
     }
 
+    /**
+     * Takes a sentence and creates a mapping from prefix(es) to suffix using a sliding-window. While the number of
+     * tokens in a single prefix is determined by the windows size, the suffix consists maximally of one token. Thus,
+     * the quality of the generated sentence correlates strongly with the size of the window.
+     *
+     * @param trainingLine the sentence that is subject to be tokenized into prefix(es) and suffix
+     */
     private void trainSingleLine(String trainingLine) {
-        String[] words = trainingLine.split(WORD_DELIMITER);
-        Queue<String> recentWords = new ArrayDeque<>(this.windowSize);
+        String[] tokens = trainingLine.split(WORD_DELIMITER);
+        Prefix currentPrefix = new Prefix(this.windowSize);
 
-        for (int wordIndex = 0; wordIndex < words.length - 1; wordIndex++) {
-            String currentWord = words[wordIndex];
-            currentWord = replaceSpecialChars(currentWord);
+        for (int tokenIndex = 0; tokenIndex < tokens.length; tokenIndex++) {
+            String currentToken = tokens[tokenIndex];
+            currentToken = replaceSpecialChars(currentToken);
 
-            LOG.fine("looking at " + currentWord);
-            recentWords.add(currentWord); //tail
-
-            LOG.fine("has suff data? " + recentWords.size());
-            if (!hasSufficientData(recentWords)) {
+            if (currentPrefix.isSmallerThanWindowSize()) {
+                LOG.fine("looking at " + currentToken);
+                currentPrefix.appendToken(currentToken);
                 LOG.fine("skip this round");
                 continue;
             }
 
-            String prefix = mergeToLowerCasePrefix(recentWords);
-            LOG.fine("Looking at prefix: " + prefix);
-            List<String> suffixes = trainingMap.getOrDefault(prefix, new ArrayList<>());
-            String suffixToAdd = words[wordIndex + 1];
-            LOG.fine("looking at suffix to add: " + suffixToAdd);
-            suffixes.add(suffixToAdd);
-            trainingMap.put(prefix, suffixes);
+            LOG.fine("Looking at prefix: " + currentPrefix);
+            List<String> suffixes = trainingMap.getOrDefault(currentPrefix, new ArrayList<>());
+
+            String suffix = currentToken;
+            LOG.fine("looking at suffix to add: " + suffix);
+            suffixes.add(suffix);
+            trainingMap.put(currentPrefix, suffixes);
             LOG.fine("map: " + trainingMap);
 
-            recentWords.remove(); //head
+            if (tokenIndex == this.windowSize) {
+                fillStartTokenList(currentPrefix);
+            }
+
+            currentPrefix = currentPrefix.shiftWithSuffix(suffix);
         }
     }
 
-    String replaceSpecialChars(String currentWord) {
-        return currentWord
+    private void fillStartTokenList(Prefix prefix) {
+        this.startPrefixes.add(prefix);
+    }
+
+    String replaceSpecialChars(String currentToken) {
+        return currentToken
                 .replaceAll("&amp;", "&")
                 .replaceAll("&gt;", ">")
                 .replaceAll("&lt;", "<")
                 .replaceAll("\\.\\.\\.", "\\u2026");
     }
 
-    private boolean hasSufficientData(Queue<String> recentWords) {
-        int currentPrefixSize = recentWords.size();
-        if (currentPrefixSize > this.windowSize) {
-            throw new IllegalStateException("Prefix size is too large: " + recentWords);
-        }
-        return currentPrefixSize == this.windowSize;
-    }
-
-    private String mergeToLowerCasePrefix(Queue<String> recentWords) {
-        String merged = "";
-
-        for (String word : recentWords) {
-            merged += word.toLowerCase() + WORD_DELIMITER;
-        }
-        return merged.trim();
-    }
-
     public String generate() {
-        String prefix = getRandomPrefix();
-        String result = prefix;
+        Prefix prefix = getStartPrefixToken();
+        String generatedSentence = prefix.toString();
 
-        int numberOfWordsPerSentence = 32;
-        for (int i = 0; i < numberOfWordsPerSentence; i++) {
+        for (int i = 0; i < MAX_NUMBER_OF_WORDS_PER_SENTENCE; i++) {
             String suffix = getRandomSuffix(prefix);
-            result += WORD_DELIMITER + suffix;
+            generatedSentence += WORD_DELIMITER + suffix;
 
             if (suffix.equals(EMPTY_RESULT)) {
                 break;
             }
-            prefix = createNewPrefix(prefix, suffix);
+            prefix = prefix.shiftWithSuffix(suffix);
         }
-        return result.trim() + SENTENCE_DELIMITER;
+        return generatedSentence.trim() + SENTENCE_DELIMITER;
     }
 
-    private String createNewPrefix(String prefix, String suffix) {
-        String[] prefixes = prefix.split(WORD_DELIMITER);
-
-        Queue<String> prefixesAsQueue = new ArrayDeque<>(Arrays.asList(prefixes));
-        prefixesAsQueue.add(suffix); // tail
-        prefixesAsQueue.remove(); // head
-
-        return mergeToLowerCasePrefix(prefixesAsQueue);
+    private Prefix getStartPrefixToken() {
+        int hundredPercent = 100;
+        int originalStartWord = random.nextInt(hundredPercent);
+        if (originalStartWord <= ORIGINAL_START_PREFIX_PROBABILITY_IN_PERCENT) {
+            return getPrefixFromStartPrefixList();
+        }
+        return getRandomStartPrefix();
     }
 
-    private String getRandomSuffix(String prefix) {
+    private Prefix getPrefixFromStartPrefixList() {
+        int keyIndex = random.nextInt(startPrefixes.size());
+        return startPrefixes.get(keyIndex);
+    }
+
+    private Prefix getRandomStartPrefix() {
+        List<Prefix> keys = new ArrayList<>(trainingMap.keySet());
+        int keyIndex = random.nextInt(keys.size());
+        return keys.get(keyIndex);
+    }
+
+    private String getRandomSuffix(Prefix prefix) {
         List<String> suffixes = trainingMap.get(prefix);
 
         if (suffixes == null) {
             return EMPTY_RESULT;
         }
-        int index = new Random().nextInt(suffixes.size());
+        int index = random.nextInt(suffixes.size());
         return suffixes.get(index);
     }
 
-    private String getRandomPrefix() {
-        List<String> keys = null;
-        int retry = 0;
-        while (keys == null) {
-            if (++retry >= NULL_SAFE_RETRIES) {
-                throw new RuntimeException("Prefix fetching is stuck.");
-            }
-            keys = new ArrayList<>(trainingMap.keySet());
-        }
-
-        int keyIndex = new Random().nextInt(keys.size());
-        return keys.get(keyIndex);
+    Map<Prefix, List<String>> getTrainingMap() {
+        return trainingMap;
     }
 
-    Map<String, List<String>> getTrainingMap() {
-        return trainingMap;
+    /**
+     * This makes the tester happy
+     * @param seed this value initializes the pseudo-random generator. For the same seed the generated values are
+     *             predictable, thus enabling testing.
+     */
+    void initializeRandom(long seed) {
+        random.setSeed(seed);
+    }
+
+    /**
+     * Changes the number of the tokens per prefix. The change of the window size drastically changes the structure of
+     * the generated sentences. This is because usually the number of mappings <code>prefix-&gt;suffix</code> decrease
+     * when window size is increased, and vice versa.
+     * <p>
+     * Hint: For a small base of sentences (less than 10000) a window size of 1 is a good choice.
+     *
+     * @param windowSize the window size be at least 1 (one); otherwise an exception is thrown
+     * @see #DEFAULT_WINDOW_SIZE
+     */
+    public void setWindowSize(int windowSize) {
+        if (windowSize < 1) {
+            throw new IllegalArgumentException("Window size must not be smaller than 1. Given: " + windowSize);
+        }
+        this.windowSize = windowSize;
     }
 }

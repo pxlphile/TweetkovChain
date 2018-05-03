@@ -15,6 +15,10 @@ public class TweetkovRunner {
     private final TweetkovChain app;
 
     public static void main(String[] args) {
+        if(args.length == 0) {
+            throw new IllegalArgumentException("No tweet archive directory given. Expected something like " +
+                    "C:\\YourTwitterHistory\\data\\js\\tweets\\");
+        }
         String directory = args[0];
         new TweetkovRunner(directory).run();
     }
