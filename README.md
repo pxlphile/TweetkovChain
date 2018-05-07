@@ -14,9 +14,33 @@ Convert your [tweets](https://www.twitter.com) to awesome fun text.
 
 ## What is a window size? 
 
-Example for a window size of 2
+The window size (also known as the order of a Markov Chain) determines the number of tokens in the prefix which are 
+examined for the search of an existing suffix. The mapping from prefix-&gt;suffix is called a dictionary. 
 
-prefix (n=2)|suffixes
+While a window size of one suffices for a small text base the textual stringency rises
+with the window size because more prefix tokens are taken into consideration. And while this CAN lead to a better
+textual stringency it also means that the word histogram MAY look totally different in terms of probable suffix
+selection. Exactly one suffix for a prefix has a general probability of p=1.0 for selection which in turn leads to
+a very high probability to re-generate already existing sentences.
+
+Given these sentences the window size the significance gets a bit clearer when you look at the two examples below.
+
+### Example for a window size of 2
+
+prefix (window size=1)|suffixes
+------|--------
+hello | \[world, again, my\]
+world | \[\]
+again | \[\]
+my | \[old, little\]
+little | \[pony\]
+old | \[friend\]
+pony | \[\]
+friend | \[\]
+
+### Example for a window size of 2
+
+prefix (window size=1)|suffixes
 ------|--------
 hello world | \[\]
 hello again | \[\]

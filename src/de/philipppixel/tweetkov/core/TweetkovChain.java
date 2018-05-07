@@ -11,8 +11,9 @@ import java.util.logging.Logger;
  * <p>Multiple occurrences of the same word possible and desired because the selection</p>
  * probability rises later on.</p>
  * <p>
- * The window size determines (also known as the order of a Markov Chain) the structure of the dictionary (that is the
- * map from prefix-&gt;suffix). While a window size of one suffices for a small text base the textual stringency rises
+ * The window size (also known as the order of a Markov Chain) determines the number of tokens in the prefix which are
+ * examined for the search of an existing suffix. The mapping from prefix-&gt;suffix is called a dictionary.</p>
+ * <p>While a window size of one suffices for a small text base the textual stringency rises
  * with the window size because more prefix tokens are taken into consideration. And while this CAN lead to a better
  * textual stringency it also means that the word histogram MAY look totally different in terms of probable suffix
  * selection. Exactly one suffix for a prefix has a general probability of p=1.0 for selection which in turn leads to
@@ -45,7 +46,6 @@ import java.util.logging.Logger;
 public class TweetkovChain {
     public static final int DEFAULT_WINDOW_SIZE = 2;
     private static final int MAX_NUMBER_OF_WORDS_PER_SENTENCE = 32;
-    private static final int NULL_SAFE_RETRIES = 5;
     private static final String SENTENCE_DELIMITER = ".";
     private static final String WORD_DELIMITER = " ";
     private static final String EMPTY_RESULT = "";
@@ -199,6 +199,7 @@ public class TweetkovChain {
 
     /**
      * This makes the tester happy
+     *
      * @param seed this value initializes the pseudo-random generator. For the same seed the generated values are
      *             predictable, thus enabling testing.
      */
