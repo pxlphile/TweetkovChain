@@ -38,7 +38,7 @@ public class LinekovRunner {
     }
 
     private void makeItWeird() {
-//        app.printHistogram();
+//        app.createHistogram();
 
         for (int i = 0; i < NUMBER_OF_SENTENCES; i++) {
             String sentence = app.generate();

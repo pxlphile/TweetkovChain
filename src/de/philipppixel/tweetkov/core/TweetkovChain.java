@@ -1,6 +1,9 @@
 package de.philipppixel.tweetkov.core;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Random;
 import java.util.logging.Logger;
 
 /**
@@ -44,16 +47,14 @@ import java.util.logging.Logger;
  * 2 or even 3 may be good choices.</p>
  */
 public class TweetkovChain {
-    public static final int DEFAULT_WINDOW_SIZE = 2;
+    private static final int DEFAULT_WINDOW_SIZE = 2;
     private static final int MAX_NUMBER_OF_WORDS_PER_SENTENCE = 32;
-    private static final String SENTENCE_DELIMITER = ".";
     private static final String WORD_DELIMITER = " ";
     private static final String EMPTY_RESULT = "";
+    private static final int DUPLICATE_TIMEOUT = 50;
     private static final Logger LOG = Logger.getLogger(TweetkovChain.class.getName());
-    private static final int ORIGINAL_START_PREFIX_PROBABILITY_IN_PERCENT = 67;
 
-    private final Map<Prefix, List<String>> trainingMap = new HashMap<>();
-    private final List<Prefix> startPrefixes = new ArrayList<>();
+    private final TransitionRepository transitionRepo = new TransitionRepository();
     private int windowSize;
     private Random random;
 
@@ -64,29 +65,45 @@ public class TweetkovChain {
         this(DEFAULT_WINDOW_SIZE);
     }
 
+    /**
+     * Creates a {@link TweetkovChain} with a selectable window size
+     *
+     * @param windowSize determines the number of prefix tokens in a transition to a suffix
+     */
     public TweetkovChain(int windowSize) {
         setWindowSize(windowSize);
         this.random = new Random();
     }
 
-    public void printHistogram() {
+    /**
+     * Creates a histogram output of the trained transitions cardinals.
+     *
+     * @return a histogram output of the trained transitions cardinals.
+     */
+    public String createHistogram() {
+        Collection<Transition> transitions = transitionRepo.getAllTransitions();
         Map<Integer, Integer> histogram = new HashMap<>();
-        for (Map.Entry<Prefix, List<String>> entry : trainingMap.entrySet()) {
-            int valueSize = entry.getValue().size();
-            System.out.printf("%s: %s\n", entry.getKey().toString(), valueSize);
+        StringBuilder result = new StringBuilder(transitions.size());
+
+        for (Transition entry : transitions) {
+            int valueSize = entry.getUniqueSuffixCount();
+
+            result.append(String.format("%s: %s\n", entry.getPrefix().toString(), valueSize));
+
             int numberOfEntriesWithThatSize = histogram.getOrDefault(valueSize, 0);
             numberOfEntriesWithThatSize++;
             histogram.put(valueSize, numberOfEntriesWithThatSize);
         }
 
         for (Map.Entry<Integer, Integer> entry : histogram.entrySet()) {
-            System.out.printf("Entries with %s prefixes: %s\n", entry.getKey().toString(), entry.getValue());
+            result.append(String.format("Entries with %s prefixes: %s\n", entry.getKey().toString(), entry.getValue()));
         }
+        return result.toString();
     }
 
     /**
-     * Takes a collection or array of sentences and creates a mapping from prefixes to suffixes for each one
-     * for later generation of sentences using the Markov property.
+     * Takes a collection or array of sentences and creates a mapping from prefixes to suffixes for each one for later
+     * generation of sentences using the Markov property.
      *
      * @param sentences a collection or array of sentences
      */
@@ -112,31 +129,31 @@ public class TweetkovChain {
             currentToken = replaceSpecialChars(currentToken);
 
             if (currentPrefix.isSmallerThanWindowSize()) {
-                LOG.fine("looking at " + currentToken);
                 currentPrefix.appendToken(currentToken);
-                LOG.fine("skip this round");
                 continue;
             }
 
-            LOG.fine("Looking at prefix: " + currentPrefix);
-            List<String> suffixes = trainingMap.getOrDefault(currentPrefix, new ArrayList<>());
-
             String suffix = currentToken;
-            LOG.fine("looking at suffix to add: " + suffix);
-            suffixes.add(suffix);
-            trainingMap.put(currentPrefix, suffixes);
-            LOG.fine("map: " + trainingMap);
 
-            if (tokenIndex == this.windowSize) {
-                fillStartTokenList(currentPrefix);
+            if (isStartPrefix(tokenIndex)) {
+                transitionRepo.trainAsStartPrefix(currentPrefix, suffix);
+            } else {
+                transitionRepo.train(currentPrefix, suffix);
             }
 
             currentPrefix = currentPrefix.shiftWithSuffix(suffix);
         }
     }
 
-    private void fillStartTokenList(Prefix prefix) {
-        this.startPrefixes.add(prefix);
+    /**
+     * returns true if the index of a given token points to
+     *
+     * @param tokenIndex the index of the current token. Currently, the index is one larger than the window size because
+     *                   the prefix building happens after incrementing the tokenIndex.
+     * @return true if the tokenIndex indicates that the prefix at hand is a start of a sentence
+     */
+    boolean isStartPrefix(int tokenIndex) {
+        return tokenIndex == this.windowSize;
     }
 
     String replaceSpecialChars(String currentToken) {
@@ -147,54 +164,54 @@ public class TweetkovChain {
                 .replaceAll("\\.\\.\\.", "\\u2026");
     }
 
-    public String generate() {
-        Prefix prefix = getStartPrefixToken();
-        String generatedSentence = prefix.toString();
+    Sentence generateSentence() {
+        Prefix prefix = transitionRepo.getFirstPrefixToken();
+        Sentence sentence = new Sentence(WORD_DELIMITER);
 
         for (int i = 0; i < MAX_NUMBER_OF_WORDS_PER_SENTENCE; i++) {
-            String suffix = getRandomSuffix(prefix);
-            generatedSentence += WORD_DELIMITER + suffix;
+            String suffix = transitionRepo.getRandomSuffix(prefix);
+            Transition transition = transitionRepo.get(prefix);
+            sentence.addBridge(suffix, transition);
 
             if (suffix.equals(EMPTY_RESULT)) {
                 break;
             }
             prefix = prefix.shiftWithSuffix(suffix);
         }
-        return generatedSentence.trim() + SENTENCE_DELIMITER;
+        return sentence;
     }
 
-    private Prefix getStartPrefixToken() {
-        int hundredPercent = 100;
-        int originalStartWord = random.nextInt(hundredPercent);
-        if (originalStartWord <= ORIGINAL_START_PREFIX_PROBABILITY_IN_PERCENT) {
-            return getPrefixFromStartPrefixList();
+    public String generate() {
+        return generateSentence().create();
+    }
+
+    /**
+     * Returns a sentence that is less likely to be a duplicate (although there is a chance).
+     * <p>
+     * This method may return an empty string (f. i. for low quality training data) when there have been
+     * attempted {@link #DUPLICATE_TIMEOUT} retries without success.
+     *
+     * @return a sentence that is less likely to be a duplicate
+     */
+    public String generateWithoutDuplicates() {
+        Sentence sentence = generateSentence();
+
+        int retryCounter = 0;
+        while (sentence.isDuplicate() && retryCounter < DUPLICATE_TIMEOUT) {
+            sentence = generateSentence();
+            retryCounter++;
         }
-        return getRandomStartPrefix();
-    }
 
-    private Prefix getPrefixFromStartPrefixList() {
-        int keyIndex = random.nextInt(startPrefixes.size());
-        return startPrefixes.get(keyIndex);
-    }
-
-    private Prefix getRandomStartPrefix() {
-        List<Prefix> keys = new ArrayList<>(trainingMap.keySet());
-        int keyIndex = random.nextInt(keys.size());
-        return keys.get(keyIndex);
-    }
-
-    private String getRandomSuffix(Prefix prefix) {
-        List<String> suffixes = trainingMap.get(prefix);
-
-        if (suffixes == null) {
-            return EMPTY_RESULT;
+        if (retryCounter == DUPLICATE_TIMEOUT) {
+            LOG.warning("Could not generate sentence without duplicate. Returning empty string.");
+            return "";
         }
-        int index = random.nextInt(suffixes.size());
-        return suffixes.get(index);
+
+        return sentence.create();
     }
 
-    Map<Prefix, List<String>> getTrainingMap() {
-        return trainingMap;
+    TransitionRepository getTransitions() {
+        return transitionRepo;
     }
 
     /**
@@ -205,6 +222,7 @@ public class TweetkovChain {
      */
     void initializeRandom(long seed) {
         random.setSeed(seed);
+        transitionRepo.initializeRandomSeed(seed);
     }
 
     /**

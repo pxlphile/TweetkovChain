@@ -97,10 +97,10 @@ public class TweetkovRunner {
     }
 
     private void makeItWeird() {
-//        app.printHistogram();
+//        app.createHistogram();
 
         for (int i = 0; i < NUMBER_OF_SENTENCES; i++) {
-            String sentence = app.generate();
+            String sentence = app.generateWithoutDuplicates();
             if(sentence.split(" ").length < 5) {
                 i--;
                 continue;
