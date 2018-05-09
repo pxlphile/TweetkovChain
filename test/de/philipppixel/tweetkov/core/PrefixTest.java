@@ -88,13 +88,32 @@ class PrefixTest {
         prefix2.appendToken("lowercase");
         prefix2.appendToken("lowercase1"); // note the extra char
 
-        boolean actual = sut.equals(prefix2);
+        boolean actual = sut.hashCode() == prefix2.hashCode();
 
-        assertThat(actual).as("Prefixes should not have same hashcode: %s <=> %s", sut, prefix2).isFalse();
+        assertThat(actual)
+                .as("Prefixes should not have same hashcode: %s <=> %s", sut.hashCode(), prefix2.hashCode())
+                .isFalse();
     }
 
     @Test
-    void hashcodeShouldBeEqualForEqualPrefixes() {
+    void hashcodeForSameTokensShouldBeEqual() {
+        Prefix sut = new Prefix(2);
+        sut.appendToken("lowercase");
+        sut.appendToken("lowercase");
+
+        Prefix prefix2 = new Prefix(2);
+        prefix2.appendToken("lowercase");
+        prefix2.appendToken("lowercase");
+
+        boolean actual = sut.equals(prefix2);
+
+        assertThat(actual)
+                .as("Prefixes should have same hashcode: %s <=> %s", sut.hashCode(), prefix2.hashCode())
+                .isTrue();
+    }
+
+    @Test
+    void hashcodeShouldIgnoreCase() {
         Prefix sut = new Prefix(2);
         sut.appendToken("lowercase");
         sut.appendToken("lowercase");
@@ -105,7 +124,9 @@ class PrefixTest {
 
         boolean actual = sut.equals(prefix2);
 
-        assertThat(actual).as("Prefixes should have same hashcode: %s <=> %s", sut, prefix2).isTrue();
+        assertThat(actual)
+                .as("Prefixes should have same hashcode: %s <=> %s", sut.hashCode(), prefix2.hashCode())
+                .isTrue();
     }
 
     @Test
